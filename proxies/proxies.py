@@ -76,15 +76,15 @@ def  fetch_and_cache_proxies() -> None:
             }
 
             data = {
-                "Status": "OK",
-                "Date": datetime.today().date().isoformat(),
+                "status": "OK",
+                "date": datetime.today().date().isoformat(),
                 "proxies": proxies,
             }
             logger.info("Loaded %d proxies and prepared to save", len(proxies))
         except Exception:
             data = {
-                "Status": "Fail",
-                "Date": datetime.today().date().isoformat(),
+                "status": "Fail",
+                "date": datetime.today().date().isoformat(),
                 "proxies": old_proxies,
             }
             logger.exception("Failed to fetch proxies")
