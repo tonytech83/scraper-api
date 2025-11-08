@@ -27,7 +27,7 @@ def load_cached_proxies() -> dict:
         with open(file_path, "r") as f:
             data = json.load(f)
 
-        if data["Date"] < datetime.today().date().isoformat():
+        if data["date"] < datetime.today().date().isoformat():
             logger.info("Proxies are stale and should be refreshed")
             return {}
 
@@ -90,8 +90,8 @@ def  fetch_and_cache_proxies() -> None:
             logger.exception("Failed to fetch proxies")
     else:
         data = {
-            "Status": "OK",
-            "Date": datetime.today().date().isoformat(),
+            "status": "OK",
+            "date": datetime.today().date().isoformat(),
             "proxies": old_proxies,
         }
         logger.info("Proxies are up-to-date; no refresh performed")
