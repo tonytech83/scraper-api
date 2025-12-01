@@ -1,4 +1,4 @@
-import logging
+from src.app_logging import get_logger
 import os, json
 from typing import TYPE_CHECKING
 from datetime import datetime
@@ -8,11 +8,7 @@ from bs4 import BeautifulSoup
 if TYPE_CHECKING:
     from bs4.element import ResultSet
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s: %(asctime)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 file_path = os.path.join(base_dir, "proxies.json")
@@ -87,7 +83,7 @@ def  fetch_and_cache_proxies() -> None:
                 "date": datetime.today().date().isoformat(),
                 "proxies": old_proxies,
             }
-            logger.exception("Failed to fetch proxies")
+            logger.warning("Using fetched data for proxies!")
     else:
         data = {
             "status": "OK",
@@ -98,5 +94,6 @@ def  fetch_and_cache_proxies() -> None:
 
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+        
     logger.info("Saved proxies to %s", file_path)
 
