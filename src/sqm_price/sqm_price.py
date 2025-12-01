@@ -4,16 +4,12 @@ import requests
 from bs4 import BeautifulSoup
 from bs4.element import ResultSet
 from typing import Any
-import logging
+from src.app_logging import get_logger
 
-from proxies.proxies import fetch_and_cache_proxies
+from src.proxies.proxies import fetch_and_cache_proxies
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s: %(asctime)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
 
+logger = get_logger(__name__)
 
 def fetch_avg_sqm_price_eur() -> dict[str, float] | dict[str, str]:
     """Scrape the average residential price per square meter in EUR.
@@ -40,7 +36,7 @@ def fetch_avg_sqm_price_eur() -> dict[str, float] | dict[str, str]:
         logger.info("Loaded proxies from %s", file_path)
     
     except FileNotFoundError:
-        logger.exception("Proxies file not found at %s", file_path)
+        logger.warning("Proxies file not found at %s", file_path)
 
 
     url = "https://www.imoti.net/bg/sredni-ceni"
@@ -69,5 +65,5 @@ def fetch_avg_sqm_price_eur() -> dict[str, float] | dict[str, str]:
         return {"avg_price": avg_price}
 
     except Exception:
-        logger.exception("Failed to fetch sqm price")
-        return {"error": "All proxies failed"}
+        logger.error("Failed to fetch sqm price")
+        return {"error": "Failed to fetch sqm price"}
