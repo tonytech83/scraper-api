@@ -1,69 +1,68 @@
-import os
-import json
+import random
+
 import requests
 from bs4 import BeautifulSoup
-from bs4.element import ResultSet
-from typing import Any
+
 from src.app_logging import get_logger
-
-from src.proxies.proxies import fetch_and_cache_proxies
-
+from src.proxies.proxies import as_requests_proxies, fetch_and_cache_proxies
 
 logger = get_logger(__name__)
 
+URL = "https://www.imoti.net/bg/sredni-ceni"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+    "Accept-Language": "bg-BG,bg;q=0.9,en;q=0.8",
+}
+MAX_ATTEMPTS = 15
+
+
+def _get_page() -> requests.Response | None:
+    """Try random proxies until one returns the price table."""
+    proxies = fetch_and_cache_proxies()
+    for proxy in random.sample(proxies, k=min(MAX_ATTEMPTS, len(proxies))):
+        try:
+            r = requests.get(
+                URL, headers=HEADERS, proxies=as_requests_proxies(proxy), timeout=8
+            )
+            r.raise_for_status()
+            if "<tbody" in r.text:
+                logger.info("Fetched page via %s", proxy)
+                return r
+            logger.warning("No table via %s", proxy)
+        except requests.RequestException as exc:
+            logger.warning("Proxy %s failed: %s", proxy, type(exc).__name__)
+    return None
+
+
 def fetch_avg_sqm_price_eur() -> dict[str, float] | dict[str, str]:
-    """Scrape the average residential price per square meter in EUR.
-
-    - Fetches `https://www.imoti.net/bg/sredni-ceni` and parses the table rows.
-    - Computes the arithmetic mean of the values in the second column.
-
-    Returns:
-        {"avg_price": float} on success, or {"error": str} on failure.
-    """
-    # reload proxies data
-    fetch_and_cache_proxies()
-
-
-    base_dir = os.path.dirname(os.path.abspath(__file__))     
-    parent_dir = os.path.abspath(os.path.join(base_dir, ".."))
-    file_path = os.path.join(parent_dir, "proxies", "proxies.json")
+    """Scrape the average residential price per square meter in EUR."""
+    response = _get_page()
+    if response is None:
+        logger.error("All %d proxy attempts failed", MAX_ATTEMPTS)
+        return {"error": "Failed to fetch sqm price"}
 
     try:
-        with open(file_path, "r") as f:
-            data = json.load(f)
-            proxies = data["proxies"]
-        
-        logger.info("Loaded proxies from %s", file_path)
-    
-    except FileNotFoundError:
-        logger.warning("Proxies file not found at %s", file_path)
+        rows = (
+            BeautifulSoup(response.content, "html.parser").find("tbody").find_all("tr")
+        )
 
-
-    url = "https://www.imoti.net/bg/sredni-ceni"
-
-    try:
-        response = requests.get(url, timeout=60, proxies=proxies)
-        soup: BeautifulSoup = BeautifulSoup(response.content, "html.parser")
-        price_per_sqm_rows: ResultSet[Any] | Any = soup.find("tbody").find_all("tr")
-
-        total_price = 0
-        count = 0
-        for row in price_per_sqm_rows:
+        prices = []
+        for row in rows:
             cells = row.find_all("td")
             if len(cells) > 1:
-                price_cell: Any = cells[1].get_text(strip=True).replace(" ", "")
+                text = (
+                    cells[1].get_text(strip=True).replace("\xa0", "").replace(" ", "")
+                )
                 try:
-                    price: float = float(price_cell)
-                    total_price += price
-                    count += 1
+                    prices.append(float(text.replace(",", ".")))
                 except ValueError:
                     continue
 
-        avg_price = total_price / count if count > 0 else None
-
+        avg_price = sum(prices) / len(prices) if prices else None
         logger.info("Computed average EUR price per sqm: %s", avg_price)
         return {"avg_price": avg_price}
 
     except Exception:
-        logger.error("Failed to fetch sqm price")
+        logger.exception("Failed to parse sqm price")
         return {"error": "Failed to fetch sqm price"}
